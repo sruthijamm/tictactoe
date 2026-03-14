@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TicTacToe AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f0f13;
+      color: #f0f0f0;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #888;
+      margin-top: -16px;
+    }
+
+    .difficulty {
+      display: flex;
+      gap: 10px;
+    }
+
+    .difficulty button {
+      padding: 8px 20px;
+      border-radius: 999px;
+      border: 1.5px solid #333;
+      background: transparent;
+      color: #aaa;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .difficulty button.active {
+      background: #7c6ff7;
+      border-color: #7c6ff7;
+      color: #fff;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 10px;
+    }
+
+    .cell {
+      background: #1a1a24;
+      border-radius: 14px;
+      border: 1.5px solid #2a2a3a;
+      font-size: 2.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #22223a;
+      transform: scale(1.04);
+    }
+
+    .cell.x { color: #7c6ff7; }
+    .cell.o { color: #f7776b; }
+    .cell.taken { cursor: not-allowed; }
+
+    .cell.win-flash {
+      animation: flash 0.5s ease 3;
+    }
+
+    @keyframes flash {
+      0%, 100% { background: #1a1a24; }
+      50% { background: #2e2860; }
+    }
+
+    .commentary {
+      min-height: 48px;
+      max-width: 360px;
+      text-align: center;
+      font-size: 1rem;
+      color: #ccc;
+      font-style: italic;
+      transition: opacity 0.3s;
+      padding: 0 12px;
+    }
+
+    .status {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #fff;
+      min-height: 28px;
+    }
+
+    .status.win  { color: #7c6ff7; }
+    .status.lose { color: #f7776b; }
+    .status.tie  { color: #aaa; }
+
+    .reset-btn {
+      padding: 10px 32px;
+      border-radius: 999px;
+      background: #7c6ff7;
+      color: #fff;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .reset-btn:hover { background: #6a5ee0; transform: scale(1.03); }
+
+    .score {
+      display: flex;
+      gap: 28px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    .score span { text-align: center; }
+    .score strong { display: block; font-size: 1.4rem; color: #fff; }
+
+    .thinking {
+      font-size: 0.8rem;
+      color: #555;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Tic Tac Toe</h1>
+  <p class="subtitle">You are X &nbsp;·&nbsp; AI is O</p>
+
+  <div class="difficulty">
+    <button onclick="setDifficulty('easy')"   id="btn-easy">Easy</button>
+    <button onclick="setDifficulty('medium')" id="btn-medium">Medium</button>
+    <button onclick="setDifficulty('hard')"   id="btn-hard" class="active">Unbeatable</button>
+  </div>
+
+  <div class="score">
+    <span><strong id="score-x">0</strong> You</span>
+    <span><strong id="score-tie">0</strong> Ties</span>
+    <span><strong id="score-o">0</strong> AI</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <p class="thinking" id="thinking"></p>
+  <p class="commentary" id="commentary">Make your first move!</p>
+  <p class="status" id="status"></p>
+
+  <button class="reset-btn" onclick="resetGame()">New Game</button>
+
+<script>
+  let board = Array(9).fill(' ');
+  let gameOver = false;
+  let difficulty = 'hard';
+  let scores = { X: 0, O: 0, tie: 0 };
+  let playerLetter = 'X';
+  let aiLetter = 'O';
+
+  function setDifficulty(d) {
+    difficulty = d;
+    document.querySelectorAll('.difficulty button').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-' + (d === 'hard' ? 'hard' : d)).classList.add('active');
+    resetGame();
+  }
+
+  function renderBoard() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+    board.forEach((cell, i) => {
+      const div = document.createElement('div');
+      div.className = 'cell' + (cell === 'X' ? ' x taken' : cell === 'O' ? ' o taken' : '');
+      div.textContent = cell === ' ' ? '' : cell;
+      div.onclick = () => humanMove(i);
+      boardEl.appendChild(div);
+    });
+  }
+
+  async function humanMove(i) {
+    if (gameOver || board[i] !== ' ') return;
+
+    board[i] = playerLetter;
+    renderBoard();
+
+    const humanWin = checkWinner(board, playerLetter);
+    const tie = !humanWin && board.every(c => c !== ' ');
+
+    if (humanWin || tie) {
+      endGame(humanWin ? playerLetter : null, []);
+      fetchCommentary(board, i, playerLetter, humanWin ? playerLetter : null, tie);
+      return;
+    }
+
+    document.getElementById('thinking').textContent = 'AI is thinking...';
+    document.getElementById('commentary').textContent = '';
+
+    try {
+      const res = await fetch('/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board, difficulty, player_letter: playerLetter, ai_letter: aiLetter })
+      });
+      const data = await res.json();
+      board = data.board;
+      renderBoard();
+      document.getElementById('thinking').textContent = '';
+      document.getElementById('commentary').textContent = data.commentary;
+
+      if (data.game_over) {
+        const winCells = data.winner ? getWinCells(board, data.winner) : [];
+        endGame(data.winner, winCells);
+      }
+    } catch (e) {
+      document.getElementById('thinking').textContent = 'Error reaching server.';
+    }
+  }
+
+  async function fetchCommentary(board, pos, mover, winner, isTie) {
+    const res = await fetch('/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board, difficulty, player_letter: playerLetter, ai_letter: aiLetter })
+    });
+  }
+
+  function checkWinner(board, letter) {
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    return wins.some(combo => combo.every(i => board[i] === letter));
+  }
+
+  function getWinCells(board, letter) {
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    return wins.find(combo => combo.every(i => board[i] === letter)) || [];
+  }
+
+  function endGame(winner, winCells) {
+    gameOver = true;
+    const statusEl = document.getElementById('status');
+    if (winner === playerLetter) {
+      statusEl.textContent = 'You win!!!';
+      statusEl.className = 'status win';
+      scores.X++;
+    } else if (winner === aiLetter) {
+      statusEl.textContent = 'AI wins this round!';
+      statusEl.className = 'status lose';
+      scores.O++;
+    } else {
+      statusEl.textContent = "It's a tie!";
+      statusEl.className = 'status tie';
+      scores.tie++;
+    }
+    document.getElementById('score-x').textContent = scores.X;
+    document.getElementById('score-o').textContent = scores.O;
+    document.getElementById('score-tie').textContent = scores.tie;
+
+    if (winCells.length) {
+      const cells = document.querySelectorAll('.cell');
+      winCells.forEach(i => cells[i].classList.add('win-flash'));
+    }
+  }
+
+  function resetGame() {
+    board = Array(9).fill(' ');
+    gameOver = false;
+    document.getElementById('status').textContent = '';
+    document.getElementById('status').className = 'status';
+    document.getElementById('commentary').textContent = 'Make your first move!';
+    document.getElementById('thinking').textContent = '';
+    renderBoard();
+  }
+
+  renderBoard();
+</script>
+</body>
+</html>
