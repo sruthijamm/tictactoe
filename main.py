@@ -108,3 +108,31 @@ def make_move(req: MoveRequest):
         game_over=game_over,
         commentary=commentary
     )
+
+@app.get("/hint")
+def get_hint(board: str, difficulty: str):
+    import json
+    board_list = json.loads(board)
+    
+    board_str = ""
+    for i in range(3):
+        row = board_list[i*3:(i+1)*3]
+        board_str += " | ".join(cell if cell != " " else str(i*3+j) for j, cell in enumerate(row))
+        if i < 2:
+            board_str += "\n---------\n"
+
+    client = anthropic.Anthropic()
+    message = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=80,
+        messages=[{
+            "role": "user",
+            "content": f"""You are a Tic Tac Toe coach. The human is playing as X.
+Current board:
+{board_str}
+
+Suggest the single best move for X in one short sentence (max 15 words). 
+Name the square number and why. Be direct."""
+        }]
+    )
+    return {"hint": message.content[0].text}

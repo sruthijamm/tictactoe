@@ -169,7 +169,10 @@
   <p class="commentary" id="commentary">Make your first move!</p>
   <p class="status" id="status"></p>
 
-  <button class="reset-btn" onclick="resetGame()">New Game</button>
+  <div style="display:flex; gap:12px;">
+    <button class="reset-btn" onclick="resetGame()">New Game</button>
+    <button class="reset-btn" id="hint-btn" onclick="getHint()" style="background:#2a2a3a; border:1.5px solid #444;">💡 Hint</button>
+  </div>
 
 <script>
   let board = Array(9).fill(' ');
@@ -292,6 +295,24 @@
   }
 
   renderBoard();
+
+  async function getHint() {
+  if (gameOver) return;
+  const btn = document.getElementById('hint-btn');
+  btn.textContent = 'Thinking...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`/hint?board=${encodeURIComponent(JSON.stringify(board))}&difficulty=${difficulty}`);
+    const data = await res.json();
+    document.getElementById('commentary').textContent = '💡 ' + data.hint;
+  } catch (e) {
+    document.getElementById('commentary').textContent = 'Could not get hint.';
+  }
+
+  btn.textContent = '💡 Hint';
+  btn.disabled = false;
+}
 </script>
 </body>
 </html>
